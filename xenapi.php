@@ -1,4 +1,4 @@
-<?
+<?php
 /*
  *    PHP XenAPI v1.0
  *    a class for XenServer API calls
@@ -27,14 +27,12 @@
  *    SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  *
  */
-
 class XenApi {
     private $_url;
-
     private $_session_id;
     private $_user;
     private $_password;
-
+    private $_ch;
     function __construct ($url, $user, $password) {
         $r = $this->xenrpc_request($url, $this->xenrpc_method('session.login_with_password', array($user, $password, '1.3')));
         if (is_array($r) && $r['Status'] == 'Success') {
@@ -46,7 +44,13 @@ class XenApi {
             echo "API failure.  (" . implode(' ', $r['ErrorDescription']) . ")\n";  exit;
         }
     }
-
+    function __destruct()
+    {
+        if (isset($this->_ch))
+        {
+            curl_close($this->_ch); 
+        }
+    }
     function __call($name, $args) {
         if (!is_array($args)) {
             $args = array();
@@ -56,7 +60,6 @@ class XenApi {
                   $this->xenrpc_method($mod . '.' . $method, array_merge(array($this->_session_id), $args))));
         return $ret;
     }
-
     function xenrpc_parseresponse($response) {
         if (!@is_array($response) && !@$response['Status']) {
             echo "API failure.  (500)\n";  exit;
@@ -79,38 +82,27 @@ class XenApi {
         }
         return $ret;
     }
-
     function xenrpc_method($name, $params) {
         $ret = xmlrpc_encode_request($name, $params);
-
         return $ret;
     }
-
     function xenrpc_request($url, $req) {
         $headers = array('Content-type: text/xml', 'Content-length: ' . strlen($req));
-
-        $ch = curl_init($url);
-
-        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
-
-        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 60);
-
-        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers); 
-
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, FALSE);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, FALSE);
-
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $req); 
-
-        $resp = curl_exec($ch);
-        curl_close($ch); 
-
+        if (!isset($this->_ch))
+        {
+            $this->_ch = curl_init($url);
+            curl_setopt($this->_ch, CURLOPT_CUSTOMREQUEST, 'POST');
+            curl_setopt($this->_ch, CURLOPT_CONNECTTIMEOUT, 10);
+            curl_setopt($this->_ch, CURLOPT_TIMEOUT, 60);
+            curl_setopt($this->_ch, CURLOPT_SSL_VERIFYPEER, FALSE);
+            curl_setopt($this->_ch, CURLOPT_SSL_VERIFYHOST, FALSE);
+            curl_setopt($this->_ch, CURLOPT_RETURNTRANSFER, 1);
+        }
+        curl_setopt($this->_ch, CURLOPT_HTTPHEADER, $headers); 
+        curl_setopt($this->_ch, CURLOPT_POSTFIELDS, $req); 
+        
+        $resp = curl_exec($this->_ch);
         $ret = xmlrpc_decode($resp);
-
         return $ret;
         }
 }
-
