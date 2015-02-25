@@ -55,7 +55,10 @@ class XenApi {
         if (!is_array($args)) {
             $args = array();
         }
-        list($mod, $method) = explode('_', $name, 2);
+        $name = str_replace("__", "#", $name);
+	list($mod, $method) = explode('_', $name, 2);
+	$mod = str_replace("#", "_", $mod);
+        
         $ret = $this->xenrpc_parseresponse($this->xenrpc_request($this->_url, 
                   $this->xenrpc_method($mod . '.' . $method, array_merge(array($this->_session_id), $args))));
         return $ret;
